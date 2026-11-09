@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="무료 주식 평단가 계산기. 기존 보유 주식과 추가 매수 내역을 입력하면 평균 매수가, 총 투자금, 보유 수량을 즉시 계산합니다.">
+  <title>무료 주식 평단가 계산기 | 50대 생활비 연구소</title>
+  <style>
+    :root { color-scheme:light; font-family:system-ui,-apple-system,'Malgun Gothic',sans-serif; color:#1b2738; background:#f3f6fa; }
+    * { box-sizing:border-box; }
+    body { margin:0; padding:24px 14px 50px; }
+    .wrap { max-width:780px; margin:auto; }
+    header { margin-bottom:22px; }
+    h1 { font-size:clamp(24px,5vw,34px); margin:0 0 10px; letter-spacing:-.8px; }
+    h2 { font-size:20px; margin:0 0 16px; }
+    p { color:#5a6676; line-height:1.7; }
+    .card { background:white; border-radius:18px; padding:23px; margin:16px 0; box-shadow:0 5px 24px #182c4910; }
+    .item { display:grid; grid-template-columns:1fr 1fr auto; gap:10px; align-items:end; margin-bottom:16px; }
+    label { display:block; font-size:14px; font-weight:650; margin-bottom:8px; }
+    input { width:100%; padding:13px 12px; border:1px solid #cbd5e1; border-radius:10px; font-size:16px; color:#15283e; background:#fff; }
+    input:focus { outline:2px solid #93bbfa; border-color:#2563eb; }
+    button { cursor:pointer; font-size:15px; font-weight:650; padding:12px 16px; border-radius:10px; border:1px solid #cbd5e1; background:white; color:#1e365c; }
+    button.primary { color:white; background:#1d5bbd; border-color:#1d5bbd; }
+    button:focus-visible { outline:3px solid #93bbfa; }
+    button.remove { color:#b42318; }
+    .actions { display:flex; flex-wrap:wrap; gap:9px; }
+    .results { display:grid; grid-template-columns:1fr 1fr; gap:13px; }
+    .metric { border-radius:13px; background:#f1f6fd; padding:18px; }
+    .metric.big { grid-column:1/-1; background:#e9f2ff; }
+    .metric small { display:block; font-weight:600; color:#50647f; margin-bottom:8px; }
+    .metric strong { font-size:clamp(19px,4vw,27px); overflow-wrap:anywhere; }
+    .metric.big strong { font-size:clamp(27px,6vw,40px); color:#1552a6; }
+    .hint { font-size:13px; margin:14px 0 0; }
+    .error { color:#b42318; font-size:14px; min-height:1em; }
+    footer { text-align:center; font-size:13px; color:#697586; margin-top:24px; }
+    @media(max-width:540px) { .card{padding:17px;} .item{grid-template-columns:1fr 1fr;} .remove{grid-column:1/-1;} .results{grid-template-columns:1fr;} .metric.big{grid-column:auto;} }
+  </style>
+</head>
+<body>
+ <main class="wrap">
+  <header><h1>📈 무료 주식 평단가 계산기</h1><p>기존 보유 내역과 추가 매수 내역을 입력하면 평균 매수가를 바로 계산해 드립니다. 국내·해외 주식 모두 사용할 수 있습니다.</p></header>
+  <section class="card" aria-labelledby="heading-input">
+   <h2 id="heading-input">매수 내역 입력</h2>
+   <div id="entries"></div>
+   <div class="actions"><button type="button" class="primary" id="add">+ 추가 매수 입력</button><button type="button" id="reset">초기화</button></div>
+   <p id="error" class="error" role="status" aria-live="polite"></p>
+  </section>
+  <section class="card" aria-labelledby="heading-result">
+   <h2 id="heading-result">계산 결과</h2>
+   <div class="results">
+    <div class="metric big"><small>평균 매수가 (평단가)</small><strong id="average" aria-live="polite">0</strong></div>
+    <div class="metric"><small>총 보유 수량</small><strong id="quantity">0주</strong></div>
+    <div class="metric"><small>총 매수 금액</small><strong id="total">0</strong></div>
+   </div>
+   <p class="hint">※ 계산에 사용한 가격의 통화 단위를 그대로 사용합니다. 수수료, 세금, 환율 변동은 반영하지 않습니다. 이 계산 결과는 투자 권유가 아닙니다.</p>
+  </section>
+  <section class="card"><h2>평단가 계산 방법</h2><p>(매수 가격 × 매수 수량)의 합계를 전체 매수 수량으로 나누면 됩니다.</p><p>예: 50,000원에 10주, 40,000원에 10주를 샀다면 평균 매수가는 45,000원입니다.</p></section>
+  <footer>50대 생활비 연구소 · 무료 계산 도구</footer>
+ </main>
+ <script>
+  const entries = document.getElementById('entries');
+  const money = n => new Intl.NumberFormat('ko-KR',{maximumFractionDigits:4}).format(n);
+  const rows = [];
+  function addRow(price='',qty='') {
+   if(rows.length>=30) { document.getElementById('error').textContent='최대 30회까지 입력할 수 있습니다.'; return; }
+   const row = document.createElement('div'); row.className='item';
+   const pWrap=document.createElement('div');const qWrap=document.createElement('div');
+   const pLabel=document.createElement('label');pLabel.textContent='매수가 (원 또는 달러)';
+   const qLabel=document.createElement('label');qLabel.textContent='매수 수량 (주)';
+   const p=document.createElement('input');p.type='number';p.min='0';p.step='any';p.placeholder='예: 50000';p.value=price;p.setAttribute('aria-label','매수가');
+   const q=document.createElement('input');q.type='number';q.min='0';q.step='any';q.placeholder='예: 10';q.value=qty;q.setAttribute('aria-label','매수 수량');
+   const remove=document.createElement('button');remove.type='button';remove.className='remove';remove.textContent='삭제';remove.setAttribute('aria-label','이 매수 내역 삭제');
+   pWrap.append(pLabel,p);qWrap.append(qLabel,q);row.append(pWrap,qWrap,remove);entries.appendChild(row);
+   const record={row,p,q};rows.push(record);
+   p.addEventListener('input',calculate);q.addEventListener('input',calculate);
+   remove.addEventListener('click',()=>{row.remove();rows.splice(rows.indexOf(record),1);calculate();});
+   calculate();
+  }
+  function calculate(){
+   let quantity=0,total=0,invalid=false;
+   for(const {p,q} of rows){
+    const price=p.value.trim()===''?0:Number(p.value), qty=q.value.trim()===''?0:Number(q.value);
+    if(!Number.isFinite(price)||!Number.isFinite(qty)||price<0||qty<0){invalid=true;continue;}
+    total+=price*qty;quantity+=qty;
+   }
+   document.getElementById('error').textContent=invalid?'음수가 아닌 올바른 숫자를 입력해 주세요.':'';
+   document.getElementById('average').textContent=invalid?'확인 필요':money(quantity>0?total/quantity:0);
+   document.getElementById('quantity').textContent=invalid?'-':money(quantity)+'주';
+   document.getElementById('total').textContent=invalid?'-':money(total);
+  }
+  document.getElementById('add').addEventListener('click',()=>addRow());
+  document.getElementById('reset').addEventListener('click',()=>{entries.replaceChildren();rows.length=0;addRow();addRow();});
+  addRow('50000','10');addRow('40000','10');
+ </script>
+</body>
+</html>
